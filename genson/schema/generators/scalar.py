@@ -1,4 +1,5 @@
 from .base import SchemaGenerator, TypedSchemaGenerator
+import re
 
 
 class Typeless(SchemaGenerator):
@@ -40,6 +41,52 @@ class String(TypedSchemaGenerator):
     JS_TYPE = 'string'
     PYTHON_TYPE = (str, type(u''))
 
+    def get_format(self,obj):
+        """
+        work out the most likely format
+        """
+        #
+        if re.match(r"htt", obj):
+           format = "url"
+
+        if re.match(r"htt", obj):
+           format = "url"
+
+        elif re.match(r"[^@\s]+@[^@\s]+\.[a-zA-Z0-9]+$", obj):
+           format = "email"
+
+        elif re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z*", obj):
+           format = "date-time"
+
+        elif re.match(r"^\w{11}$", obj):
+           format = "uid"
+
+        elif re.match(r"^#[0-9a-fA-F]{6}$", obj):
+           format = "COLOR"
+
+        else:
+            format = "general"
+
+        return format
+
+    def add_object(self, obj, mode):
+        if self.MIN is None or len(obj) < self.MIN:
+            if mode != "learn":
+                # testing mode
+                self.SCHEMA_ERROR += ['value smaller than schema minimum']
+            self.MIN = len(obj)
+        if self.MAX is None or len(obj) > self.MAX:
+            if mode != "learn":
+                # testing mode
+                self.SCHEMA_ERROR += ['value larger than schema maximum']
+            self.MAX = len(obj)
+        newFormat = self.get_format(obj)
+        if self.FORMAT is None or newFormat != self.FORMAT:
+            if mode != "learn" and newFormat != None:
+                # testing mode
+                self.SCHEMA_ERROR += ['value format '+newFormat+' does not match schema format '+ self.FORMAT]
+            self.FORMAT = newFormat
+
 
 class Number(SchemaGenerator):
     """
@@ -60,17 +107,36 @@ class Number(SchemaGenerator):
 
     def init(self):
         self._type = 'integer'
+        #print("INIT number") #PPPP
 
     def add_schema(self, schema):
+        #print("AddSchemaObject--",obj) #PPPP
         self.add_extra_keywords(schema)
         if schema.get('type') == 'number':
             self._type = 'number'
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode):
+        #print("AddNumberObject--",obj) #PPPP
+        if self.MIN is None or obj < self.MIN:   
+            if mode != "learn":
+                # testing mode         
+                print(obj ,"smaller than schema min", self.MIN)
+            self.MIN = obj
+        if self.MAX is None or obj > self.MAX:
+            if mode != "learn":
+                # testing mode
+                print(obj, "larger than schema max", self.MAX)
+            self.MAX = obj
         if isinstance(obj, float):
             self._type = 'number'
 
     def to_schema(self):
         schema = super(Number, self).to_schema()
         schema['type'] = self._type
+        schema['min'] = self.MIN
+        schema['max'] = self.MAX
+        schema['format'] = self.FORMAT
+        if len(self.SCHEMA_ERROR):
+            schema['schema_error'] = self.SCHEMA_ERROR
+        #print("NumberToSchema---",self.MIN) #PPPP
         return schema

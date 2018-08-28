@@ -1,8 +1,33 @@
 from .generators import GENERATORS, Typeless
-
+import re
 
 class SchemaGenerationError(RuntimeError):
     pass
+
+
+class xType(object):
+    def __init__(self, tipe, min, max, format):
+        self.tipe = tipe
+        self.min = min
+        self.max = max
+        self.format = format
+    def asDict(self):
+        return {'type':self.tipe, 'min':self.min, 'max':self.max, 'format':self.format}
+    def __str__(self):
+        return "xType(%s, %s, %s)" % (self.tipe, self.min, self.max, self.format)
+    def __repr__(self):
+        return self.__dict__
+    def __eq__(self, other):
+        if isinstance(other, xType):
+            return ((self.tipe == other.tipe) and (self.min == other.min) and (self.max == other.max) and (self.format == other.format))
+        else:
+            return False
+    def __ne__(self, other):
+        return (not self.__eq__(other))
+    def __lt__(self, other):
+        return self.min < other.min
+    def __hash__(self):
+        return hash(self.__str__())
 
 
 class SchemaNode(object):
@@ -13,7 +38,11 @@ class SchemaNode(object):
     generator_classes = GENERATORS
 
     def __init__(self):
+        self.mode = "learn"
         self._schema_generators = []
+
+    def set_mode(self,mode):
+        self.mode = mode
 
     def add_schema(self, schema):
         """
@@ -26,17 +55,19 @@ class SchemaNode(object):
 
         # serialize instances of SchemaNode before parsing
         if isinstance(schema, SchemaNode):
+            #print("node") #PPPP
             schema = schema.to_schema()
 
         for subschema in self._get_subschemas(schema):
             # delegate to SchemaType object
+            #print("subschema: ", subschema) #PPPP
             schema_generator = self._get_generator_for_schema(subschema)
             schema_generator.add_schema(subschema)
 
         # return self for easy method chaining
         return self
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode="learn"):
         """
         Modify the schema to accomodate an object.
 
@@ -44,13 +75,18 @@ class SchemaNode(object):
         * `obj` (required - `dict`):
           a JSON object to use in generating the schema.
         """
+        #print("  OB_in_node", obj) #PPPP
 
+        self.object = obj
         # delegate to SchemaType object
         schema_generator = self._get_generator_for_object(obj)
-        schema_generator.add_object(obj)
+        #print("ADD  : ",obj, schema_generator.to_schema()) #PPPP
+        schema_generator.add_object(obj, mode)
+        #print("ADDED: ",obj) #PPPP
 
         # return self for easy method chaining
         return self
+
 
     def to_schema(self):
         """
@@ -58,19 +94,31 @@ class SchemaNode(object):
         """
         types = set()
         generated_schemas = []
+        #print("doit") #PPPP
         for schema_generator in self._schema_generators:
             generated_schema = schema_generator.to_schema()
-            if len(generated_schema) == 1 and 'type' in generated_schema:
-                types.add(generated_schema['type'])
+            ##print("=========hi:                 ",generated_schema) #PPPP
+            if len(generated_schema) == 3 and 'min' in generated_schema:
+                #print("TS_GS:",generated_schema) #PPPP
+                xt = xType(generated_schema['type'],generated_schema['min'],generated_schema['max'],generated_schema['format'])
+                #print("will add") #PPPP
+                types.add(xt)
             else:
+                #print("to_schema APPENDING: ", generated_schema) #PPPP
                 generated_schemas.append(generated_schema)
 
         if types:
             if len(types) == 1:
                 (types,) = types
+                #print("failing") #PPPP
+                generated_schemas = [types.asDict()] + generated_schemas
             else:
                 types = sorted(types)
-            generated_schemas = [{'type': types}] + generated_schemas
+                #print("PHIL:",types[0].asDict()) #PPPP
+                #print("dying") #PPPP
+                for tp in types:
+                    generated_schemas = [tp.asDict()] + generated_schemas
+
         if len(generated_schemas) == 1:
             (result_schema,) = generated_schemas
         elif generated_schemas:
@@ -116,6 +164,7 @@ class SchemaNode(object):
     def _get_generator_for_(self, kind, schema_or_obj):
         # check existing types
         for schema_generator in self._schema_generators:
+            #print("_get_generator_for_", kind, schema_or_obj) #PPPP
             if getattr(schema_generator, 'match_' + kind)(schema_or_obj):
                 return schema_generator
 

@@ -21,6 +21,7 @@ class SchemaBuilder(object):
           ``None`` will direct GenSON to leave out the ``"$schema"``
           keyword.
         """
+        self.mode = "learn"
         if schema_uri is None or schema_uri is False:
             self.schema_uri = self.NULL_URI
         elif schema_uri == 'DEFAULT':
@@ -29,6 +30,11 @@ class SchemaBuilder(object):
             self.schema_uri = schema_uri
 
         self._root_node = SchemaNode()
+
+    def set_mode(self, mode):
+        self.mode = mode
+        self._root_node.set_mode = mode
+
 
     def add_schema(self, schema):
         """
@@ -41,6 +47,8 @@ class SchemaBuilder(object):
             There is no schema validation. If you pass in a bad schema,
             you might get back a bad schema.
         """
+        #print("builder:add_Schema") #PPPP
+
         if isinstance(schema, SchemaBuilder):
             schema_uri = schema.schema_uri
             schema = schema.to_schema()
@@ -54,14 +62,17 @@ class SchemaBuilder(object):
             schema = dict(schema)
             del schema['$schema']
         self._root_node.add_schema(schema)
+        #print("RN",self._root_node) #PPPP
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode="learn"):
         """
         Modify the schema to accomodate an object.
 
         :param obj: any object or scalar that can be serialized in JSON
         """
-        self._root_node.add_object(obj)
+        self._root_node.add_object(obj, mode)
+
+        #print("OB",self._root_node) #PPPP
 
     def to_schema(self):
         """

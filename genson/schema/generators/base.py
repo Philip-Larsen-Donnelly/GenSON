@@ -14,7 +14,7 @@ class SchemaGenerator(object):
     * add_object
     * to_schema
     """
-    KEYWORDS = ('type')
+    KEYWORDS = ('type','min','max','format', 'default')
 
     @classmethod
     def match_schema(cls, schema):
@@ -26,6 +26,10 @@ class SchemaGenerator(object):
 
     def __init__(self, node_class):
         self.node_class = node_class
+        self.MIN = None
+        self.MAX = None
+        self.FORMAT = None
+        self.SCHEMA_ERROR = []
         self._extra_keywords = {}
         self.init()
 
@@ -38,6 +42,12 @@ class SchemaGenerator(object):
     def add_extra_keywords(self, schema):
         for keyword, value in schema.items():
             if keyword in self.KEYWORDS:
+                if keyword == "max":
+                    self.MAX = value
+                if keyword == "min":
+                    self.MIN = value
+                if keyword == "format":
+                    self.FORMAT = value
                 continue
             elif keyword not in self._extra_keywords:
                 self._extra_keywords[keyword] = value
@@ -46,7 +56,7 @@ class SchemaGenerator(object):
                       'values ({1!r} vs. {2!r}). Using {1!r}').format(
                           keyword, self._extra_keywords[keyword], value))
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode="learn"):
         pass
 
     def to_schema(self):
@@ -73,4 +83,9 @@ class TypedSchemaGenerator(SchemaGenerator):
     def to_schema(self):
         schema = super(TypedSchemaGenerator, self).to_schema()
         schema['type'] = self.JS_TYPE
+        schema['min'] = self.MIN
+        schema['max'] = self.MAX
+        schema['format'] = self.FORMAT
+        if len(self.SCHEMA_ERROR):
+            schema['schema_error'] = self.SCHEMA_ERROR
         return schema

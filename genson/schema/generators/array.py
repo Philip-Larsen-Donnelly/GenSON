@@ -37,9 +37,9 @@ class List(BaseArray):
         if 'items' in schema:
             self._items.add_schema(schema['items'])
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode):
         for item in obj:
-            self._items.add_object(item)
+            self._items.add_object(item, mode)
 
     def items_to_schema(self):
         return self._items.to_schema()
@@ -63,7 +63,7 @@ class Tuple(BaseArray):
         if 'items' in schema:
             self._add(schema['items'], 'add_schema')
 
-    def add_object(self, obj):
+    def add_object(self, obj, mode):
         self._add(obj, 'add_object')
 
     def _add(self, items, func):
